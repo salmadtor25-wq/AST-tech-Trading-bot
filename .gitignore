@@ -1,0 +1,12 @@
+# AST Capital Bot — never commit these
+bot/credentials.json
+bot/logs/
+bot/data/*.csv
+bot/data/*.png
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.egg-info/
+dist/
+build/

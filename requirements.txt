@@ -1,0 +1,19 @@
+# AST Capital Trading Bot — Python dependencies
+# Install with:  pip install -r requirements.txt
+
+# Core data / numerics
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Technical analysis (optional — bot uses pure numpy/pandas internally)
+ta>=0.11.0
+
+# Charting
+matplotlib>=3.7.0
+
+# MetaTrader 5 API (Windows only)
+# On Linux use a Windows VM or Wine — MT5 does not run natively on Linux
+MetaTrader5>=5.0.45
+
+# Optional: better terminal output
+colorama>=0.4.6
