@@ -24,7 +24,8 @@ from config import (
     RISK_PER_TRADE, MAX_OPEN_TRADES, DAILY_LOSS_LIMIT,
     MIN_LOT_SIZE, LOT_STEP, COLORS,
 )
-from indicators import C_EMA50, C_EMA200, C_RSI, C_ATR, SIGNAL_COL
+from indicators import C_EMA50, C_EMA200, C_RSI, C_ATR
+from strategy import SIGNAL_COL
 from risk import RiskManager
 from logger import log_info, log_warning, log_separator
 
