@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AST Capital — Trading Platform</title>
+<link rel="stylesheet" href="/static/css/style.css"/>
+<!-- TradingView Lightweight Charts -->
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     LOGIN SCREEN
+════════════════════════════════════════════════════════════ -->
+<div id="login-screen">
+  <div class="login-bg-grid"></div>
+  <div class="login-container">
+
+    <div class="login-brand">
+      <div class="brand-diamond">◈</div>
+      <div class="brand-text">
+        <span class="brand-name">AST CAPITAL</span>
+        <span class="brand-sub">Algorithmic Trading Platform</span>
+      </div>
+    </div>
+
+    <div class="login-card">
+      <div class="login-card-header">
+        <span class="login-card-title">MT5 ACCOUNT ACCESS</span>
+        <span class="login-card-sub">Enter your broker credentials to connect</span>
+      </div>
+
+      <form id="login-form" autocomplete="off">
+        <div class="form-group">
+          <label class="form-label">Account Number</label>
+          <input id="f-login" type="number" class="form-input" placeholder="e.g. 12345678" required/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input id="f-pass" type="password" class="form-input" placeholder="Your account password" required/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Broker Server</label>
+          <input id="f-server" type="text" class="form-input" placeholder="e.g. ICMarkets-Demo" required/>
+        </div>
+
+        <div class="mode-selector">
+          <label class="mode-opt demo-opt active" id="lbl-demo">
+            <input type="radio" name="mode" value="demo" checked/> DEMO
+            <span class="mode-badge">Safe</span>
+          </label>
+          <label class="mode-opt live-opt" id="lbl-live">
+            <input type="radio" name="mode" value="live"/> LIVE
+            <span class="mode-badge danger">Real Money</span>
+          </label>
+        </div>
+
+        <div id="live-warning" class="live-warning hidden">
+          ⚠ You are selecting LIVE mode. Real funds will be at risk.
+          Losses are permanent. Ensure LIVE_TRADING_ENABLED=True in config.py.
+        </div>
+
+        <button type="submit" class="btn-connect" id="btn-connect">
+          <span id="connect-text">CONNECT TO MT5</span>
+          <span id="connect-spinner" class="spinner hidden"></span>
+        </button>
+      </form>
+
+      <div id="login-error" class="login-error hidden"></div>
+    </div>
+
+    <div class="login-footer">
+      <span>© 2024 AST Capital</span>
+      <span class="sep">·</span>
+      <span>Authorised Users Only</span>
+      <span class="sep">·</span>
+      <span>v2.0</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     MAIN APPLICATION
+════════════════════════════════════════════════════════════ -->
+<div id="app" class="hidden">
+
+  <!-- TOP HEADER BAR -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle sidebar">☰</button>
+      <div class="topbar-brand">
+        <span class="brand-diamond-sm">◈</span>
+        <span class="topbar-brand-name">AST CAPITAL</span>
+      </div>
+      <div class="topbar-market-status" id="market-status-badge">
+        <span class="status-dot" id="market-dot"></span>
+        <span id="market-label">Checking…</span>
+      </div>
+    </div>
+
+    <div class="topbar-center">
+      <select class="select-sm" id="header-symbol">
+        <option>EURUSD</option><option>GBPUSD</option><option>USDJPY</option>
+        <option>AUDUSD</option><option>USDCAD</option><option>EURGBP</option>
+        <option>XAUUSD</option><option>GBPJPY</option>
+      </select>
+      <select class="select-sm" id="header-tf">
+        <option>M5</option><option>M15</option><option value="H1" selected>H1</option>
+        <option>H4</option><option>D1</option>
+      </select>
+      <div class="live-price-box">
+        <span class="price-label" id="live-symbol-label">EURUSD</span>
+        <span class="price-bid" id="live-bid">—</span>
+        <span class="price-sep">/</span>
+        <span class="price-ask" id="live-ask">—</span>
+        <span class="spread-badge" id="live-spread"></span>
+      </div>
+    </div>
+
+    <div class="topbar-right">
+      <div class="account-mini">
+        <div class="acc-item">
+          <span class="acc-lbl">Balance</span>
+          <span class="acc-val" id="hdr-balance">—</span>
+        </div>
+        <div class="acc-item">
+          <span class="acc-lbl">Equity</span>
+          <span class="acc-val" id="hdr-equity">—</span>
+        </div>
+        <div class="acc-item">
+          <span class="acc-lbl">Daily P&L</span>
+          <span class="acc-val" id="hdr-dpnl">—</span>
+        </div>
+      </div>
+      <div class="mode-indicator" id="mode-indicator">DEMO</div>
+      <div class="ws-indicator" id="ws-indicator" title="WebSocket">●</div>
+      <button class="btn-logout" id="btn-logout">Logout</button>
+    </div>
+  </header>
+
+  <!-- LAYOUT: sidebar + main -->
+  <div class="app-layout">
+
+    <!-- SIDEBAR -->
+    <nav class="sidebar" id="sidebar">
+      <div class="nav-section-label">NAVIGATION</div>
+      <a href="#" class="nav-item active" data-page="dashboard">
+        <span class="nav-icon">⊞</span><span class="nav-label">Dashboard</span>
+      </a>
+      <a href="#" class="nav-item" data-page="charts">
+        <span class="nav-icon">◫</span><span class="nav-label">Live Charts</span>
+      </a>
+      <a href="#" class="nav-item" data-page="signals">
+        <span class="nav-icon">◎</span><span class="nav-label">Signals</span>
+        <span class="nav-badge" id="signal-badge"></span>
+      </a>
+      <a href="#" class="nav-item" data-page="positions">
+        <span class="nav-icon">▤</span><span class="nav-label">Positions</span>
+        <span class="nav-badge" id="pos-badge"></span>
+      </a>
+      <a href="#" class="nav-item" data-page="history">
+        <span class="nav-icon">⟳</span><span class="nav-label">History</span>
+      </a>
+
+      <div class="nav-section-label" style="margin-top:16px">BOT</div>
+      <a href="#" class="nav-item" data-page="bot">
+        <span class="nav-icon">⚙</span><span class="nav-label">Bot Control</span>
+        <span class="bot-running-dot hidden" id="bot-running-dot"></span>
+      </a>
+      <a href="#" class="nav-item" data-page="settings">
+        <span class="nav-icon">≡</span><span class="nav-label">Settings</span>
+      </a>
+
+      <div class="sidebar-footer">
+        <div class="sf-row"><span class="sf-lbl">Server</span><span class="sf-val" id="sb-server">—</span></div>
+        <div class="sf-row"><span class="sf-lbl">Account</span><span class="sf-val" id="sb-login">—</span></div>
+        <div class="sf-row"><span class="sf-lbl">Leverage</span><span class="sf-val" id="sb-leverage">—</span></div>
+        <div class="sf-row utc-clock" id="sf-clock">00:00:00 UTC</div>
+      </div>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+
+      <!-- ── DASHBOARD ── -->
+      <section id="page-dashboard" class="page active">
+        <div class="page-header"><h1>Dashboard</h1><span class="page-sub">Overview</span></div>
+
+        <div class="stat-grid">
+          <div class="stat-card"><div class="stat-label">Balance</div><div class="stat-val" id="d-balance">—</div><div class="stat-sub" id="d-currency">—</div></div>
+          <div class="stat-card"><div class="stat-label">Equity</div><div class="stat-val" id="d-equity">—</div><div class="stat-sub" id="d-margin-level">Margin Level: —</div></div>
+          <div class="stat-card"><div class="stat-label">Open P&amp;L</div><div class="stat-val" id="d-profit">—</div><div class="stat-sub" id="d-positions">0 positions</div></div>
+          <div class="stat-card"><div class="stat-label">Daily P&amp;L</div><div class="stat-val" id="d-dpnl">—</div><div class="stat-sub" id="d-drisk">Risk: —</div></div>
+          <div class="stat-card"><div class="stat-label">Free Margin</div><div class="stat-val" id="d-free-margin">—</div><div class="stat-sub" id="d-margin">Margin: —</div></div>
+          <div class="stat-card"><div class="stat-label">Open Trades</div><div class="stat-val" id="d-open-trades">0</div><div class="stat-sub">Max 3 allowed</div></div>
+        </div>
+
+        <div class="two-col">
+          <!-- Mini chart -->
+          <div class="card flex-2">
+            <div class="card-header">
+              <span class="card-title">Price Chart</span>
+              <span class="card-sub" id="mini-chart-label">EURUSD · H1</span>
+            </div>
+            <div id="mini-chart" class="mini-chart"></div>
+          </div>
+
+          <!-- Right column -->
+          <div class="col-stack">
+            <!-- Signal card -->
+            <div class="card">
+              <div class="card-header"><span class="card-title">Current Signal</span></div>
+              <div class="signal-display" id="d-signal-box">
+                <div class="signal-pill none" id="d-signal-pill">NONE</div>
+                <div class="signal-reason" id="d-signal-reason">Evaluating…</div>
+              </div>
+            </div>
+
+            <!-- Market status -->
+            <div class="card">
+              <div class="card-header"><span class="card-title">Market Status</span></div>
+              <div class="market-info">
+                <div class="mi-row"><span class="mi-lbl">Status</span><span class="mi-val" id="d-mkt-status">—</span></div>
+                <div class="mi-row"><span class="mi-lbl">Session</span><span class="mi-val" id="d-mkt-session">—</span></div>
+                <div class="mi-row"><span class="mi-lbl">UTC Time</span><span class="mi-val" id="d-mkt-time">—</span></div>
+              </div>
+            </div>
+
+            <!-- Bot status -->
+            <div class="card">
+              <div class="card-header"><span class="card-title">Bot Status</span></div>
+              <div class="bot-status-mini">
+                <div class="bsm-indicator" id="bsm-indicator">
+                  <span class="bsm-dot stopped"></span>
+                  <span class="bsm-label" id="bsm-label">Stopped</span>
+                </div>
+                <button class="btn-sm btn-start" id="d-btn-start" onclick="App.navTo('bot')">Control Bot →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent positions -->
+        <div class="card" style="margin-top:16px">
+          <div class="card-header"><span class="card-title">Open Positions</span>
+            <button class="btn-xs" onclick="App.navTo('positions')">View All →</button>
+          </div>
+          <div id="d-pos-table-wrap"><table class="data-table" id="d-pos-table">
+            <thead><tr><th>Symbol</th><th>Type</th><th>Vol</th><th>Entry</th><th>Current</th><th>P&amp;L</th><th>SL</th><th>TP</th><th></th></tr></thead>
+            <tbody id="d-pos-tbody"><tr><td colspan="9" class="empty-row">No open positions</td></tr></tbody>
+          </table></div>
+        </div>
+      </section>
+
+      <!-- ── LIVE CHARTS ── -->
+      <section id="page-charts" class="page hidden">
+        <div class="page-header">
+          <h1>Live Charts</h1>
+          <div class="chart-controls">
+            <select class="select-sm" id="chart-symbol"></select>
+            <select class="select-sm" id="chart-tf"></select>
+            <button class="btn-sm" id="chart-refresh">↺ Refresh</button>
+            <label class="toggle-label"><input type="checkbox" id="chart-ema50" checked> EMA 50</label>
+            <label class="toggle-label"><input type="checkbox" id="chart-ema200" checked> EMA 200</label>
+            <label class="toggle-label"><input type="checkbox" id="chart-signals" checked> Signals</label>
+          </div>
+        </div>
+        <div class="chart-layout">
+          <div class="chart-main-col">
+            <div class="card chart-card">
+              <div class="card-header">
+                <span class="card-title" id="chart-main-label">EURUSD · H1 — Candlestick + EMA</span>
+                <span class="live-badge">LIVE</span>
+              </div>
+              <div id="main-chart" class="main-chart"></div>
+            </div>
+            <div class="card chart-card" style="margin-top:12px">
+              <div class="card-header"><span class="card-title">RSI (14)</span>
+                <span class="rsi-value-badge" id="rsi-value-badge">—</span>
+              </div>
+              <div id="rsi-chart" class="rsi-chart"></div>
+            </div>
+            <div class="card chart-card" style="margin-top:12px">
+              <div class="card-header"><span class="card-title">ATR (14) — Volatility</span>
+                <span class="atr-value-badge" id="atr-value-badge">—</span>
+              </div>
+              <div id="atr-chart" class="atr-chart"></div>
+            </div>
+          </div>
+          <!-- Right: signal conditions panel -->
+          <div class="chart-side-panel">
+            <div class="card" style="height:100%">
+              <div class="card-header"><span class="card-title">Signal Conditions</span></div>
+              <div class="conditions-panel" id="conditions-panel">
+                <div class="cond-loading">Loading…</div>
+              </div>
+              <div class="signal-result-box" id="chart-signal-box">
+                <div class="signal-pill none" id="chart-signal-pill">NONE</div>
+                <div class="signal-reason small" id="chart-signal-reason">—</div>
+              </div>
+              <div class="cond-values" id="cond-values"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── SIGNALS ── -->
+      <section id="page-signals" class="page hidden">
+        <div class="page-header"><h1>Trading Signals</h1><span class="page-sub">Real-time strategy evaluation</span></div>
+
+        <div class="two-col">
+          <div class="card flex-2">
+            <div class="card-header">
+              <span class="card-title">Current Evaluation</span>
+              <div style="display:flex;gap:8px;align-items:center">
+                <select class="select-sm" id="sig-symbol"></select>
+                <select class="select-sm" id="sig-tf"></select>
+                <button class="btn-sm" id="sig-refresh">↺ Evaluate</button>
+              </div>
+            </div>
+            <div class="big-signal-display">
+              <div class="bsd-signal">
+                <div class="bsd-pill none" id="sig-pill">NONE</div>
+                <div class="bsd-label" id="sig-label">EURUSD · H1</div>
+              </div>
+              <div class="bsd-reason" id="sig-reason">Press Evaluate to run analysis.</div>
+            </div>
+
+            <div class="conditions-grid" id="sig-conditions-grid">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <div class="col-stack">
+            <div class="card">
+              <div class="card-header"><span class="card-title">Indicator Snapshot</span></div>
+              <div class="indicator-snapshot" id="sig-snapshot">
+                <div class="snap-row"><span>Close</span><span id="sn-close">—</span></div>
+                <div class="snap-row"><span>EMA 50</span><span id="sn-ema50">—</span></div>
+                <div class="snap-row"><span>EMA 200</span><span id="sn-ema200">—</span></div>
+                <div class="snap-row"><span>RSI (14)</span><span id="sn-rsi">—</span></div>
+                <div class="snap-row"><span>ATR (14)</span><span id="sn-atr">—</span></div>
+                <div class="snap-row"><span>ATR MA</span><span id="sn-atrma">—</span></div>
+                <div class="snap-row"><span>Recent High</span><span id="sn-rhigh">—</span></div>
+                <div class="snap-row"><span>Recent Low</span><span id="sn-rlow">—</span></div>
+                <div class="snap-row"><span>EMA Slope</span><span id="sn-slope">—</span></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><span class="card-title">Entry Levels</span></div>
+              <div class="indicator-snapshot">
+                <div class="snap-row"><span>Entry</span><span id="sn-entry" class="hl-gold">—</span></div>
+                <div class="snap-row"><span>Stop Loss</span><span id="sn-sl" class="hl-red">—</span></div>
+                <div class="snap-row"><span>Take Profit</span><span id="sn-tp" class="hl-green">—</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── POSITIONS ── -->
+      <section id="page-positions" class="page hidden">
+        <div class="page-header">
+          <h1>Open Positions</h1>
+          <div style="display:flex;gap:8px">
+            <button class="btn-sm" id="pos-refresh">↺ Refresh</button>
+            <button class="btn-sm btn-danger" id="pos-close-all">✕ Close All</button>
+          </div>
+        </div>
+
+        <div class="stat-grid sm">
+          <div class="stat-card"><div class="stat-label">Open Trades</div><div class="stat-val" id="p-count">0</div></div>
+          <div class="stat-card"><div class="stat-label">Total Volume</div><div class="stat-val" id="p-volume">0</div></div>
+          <div class="stat-card"><div class="stat-label">Floating P&amp;L</div><div class="stat-val" id="p-pnl">—</div></div>
+          <div class="stat-card"><div class="stat-label">Margin Used</div><div class="stat-val" id="p-margin">—</div></div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="table-wrap">
+            <table class="data-table" id="positions-table">
+              <thead><tr>
+                <th>Ticket</th><th>Symbol</th><th>Type</th><th>Volume</th>
+                <th>Entry</th><th>Current</th><th>SL</th><th>TP</th>
+                <th>P&amp;L</th><th>Swap</th><th>Time</th><th>Action</th>
+              </tr></thead>
+              <tbody id="positions-tbody">
+                <tr><td colspan="12" class="empty-row">No open positions</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── HISTORY ── -->
+      <section id="page-history" class="page hidden">
+        <div class="page-header">
+          <h1>Trade History</h1>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select class="select-sm" id="hist-days">
+              <option value="7">Last 7 days</option>
+              <option value="30" selected>Last 30 days</option>
+              <option value="90">Last 90 days</option>
+            </select>
+            <button class="btn-sm" id="hist-refresh">↺ Load</button>
+          </div>
+        </div>
+
+        <div class="stat-grid sm">
+          <div class="stat-card"><div class="stat-label">Total Trades</div><div class="stat-val" id="h-total">—</div></div>
+          <div class="stat-card"><div class="stat-label">Net P&amp;L</div><div class="stat-val" id="h-pnl">—</div></div>
+          <div class="stat-card"><div class="stat-label">Commission</div><div class="stat-val" id="h-comm">—</div></div>
+          <div class="stat-card"><div class="stat-label">Win Rate</div><div class="stat-val" id="h-wr">—</div></div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="table-wrap">
+            <table class="data-table" id="history-table">
+              <thead><tr>
+                <th>Ticket</th><th>Symbol</th><th>Type</th><th>Volume</th>
+                <th>Price</th><th>P&amp;L</th><th>Commission</th><th>Swap</th><th>Time</th>
+              </tr></thead>
+              <tbody id="history-tbody">
+                <tr><td colspan="9" class="empty-row">Press Load to fetch history</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── BOT CONTROL ── -->
+      <section id="page-bot" class="page hidden">
+        <div class="page-header"><h1>Bot Control</h1><span class="page-sub">Automated Trading Engine</span></div>
+
+        <div class="bot-layout">
+          <!-- Control panel -->
+          <div class="col-stack" style="max-width:340px">
+            <div class="card">
+              <div class="card-header"><span class="card-title">Trading Engine</span></div>
+              <div class="bot-control-panel">
+                <div class="bot-status-display" id="bot-status-display">
+                  <div class="bsd-dot-wrap">
+                    <span class="bsd-big-dot stopped" id="bot-big-dot"></span>
+                  </div>
+                  <div class="bsd-text">
+                    <div class="bsd-state" id="bot-state-label">STOPPED</div>
+                    <div class="bsd-mode" id="bot-mode-label">—</div>
+                  </div>
+                </div>
+
+                <div class="bot-settings">
+                  <div class="form-group">
+                    <label class="form-label">Symbol</label>
+                    <select class="form-input" id="bot-symbol"></select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Timeframe</label>
+                    <select class="form-input" id="bot-tf"></select>
+                  </div>
+                </div>
+
+                <div class="bot-btn-row">
+                  <button class="btn-start-big" id="btn-bot-start">▶ START BOT</button>
+                  <button class="btn-stop-big" id="btn-bot-stop" disabled>■ STOP</button>
+                </div>
+
+                <div class="warning-box" id="live-mode-warn" style="display:none">
+                  ⚠ LIVE MODE ACTIVE — Real money at risk
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header"><span class="card-title">Risk Dashboard</span></div>
+              <div class="risk-panel" id="risk-panel">
+                <div class="risk-meter-wrap">
+                  <div class="risk-meter-label">Daily Loss Used</div>
+                  <div class="risk-meter">
+                    <div class="risk-meter-fill" id="risk-meter-fill"></div>
+                  </div>
+                  <div class="risk-meter-vals">
+                    <span id="risk-pnl-lbl">0%</span>
+                    <span class="risk-limit">Limit: 5%</span>
+                  </div>
+                </div>
+                <div class="risk-rows">
+                  <div class="risk-row"><span>Daily P&L</span><span id="r-dpnl">—</span></div>
+                  <div class="risk-row"><span>Trades Today</span><span id="r-trades">—</span></div>
+                  <div class="risk-row"><span>Risk/Trade</span><span id="r-rpt">1%</span></div>
+                  <div class="risk-row"><span>Max Positions</span><span id="r-maxpos">3</span></div>
+                  <div class="risk-row"><span>Daily Limit</span><span id="r-dlimit">5%</span></div>
+                  <div class="risk-row"><span>Status</span><span id="r-status" class="hl-green">Active</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header"><span class="card-title">Last Signal</span></div>
+              <div class="signal-display" id="bot-last-signal">
+                <div class="signal-pill none" id="bot-sig-pill">NONE</div>
+                <div class="signal-reason small" id="bot-sig-reason">No evaluation yet</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Log console -->
+          <div class="card flex-1">
+            <div class="card-header">
+              <span class="card-title">Activity Log</span>
+              <button class="btn-xs" id="log-clear">Clear</button>
+            </div>
+            <div class="log-console" id="log-console">
+              <div class="log-entry system">System ready. Press START to begin trading.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── SETTINGS ── -->
+      <section id="page-settings" class="page hidden">
+        <div class="page-header"><h1>Settings</h1><span class="page-sub">Configuration</span></div>
+
+        <div class="two-col">
+          <div class="col-stack">
+            <div class="card">
+              <div class="card-header"><span class="card-title">Strategy Parameters</span></div>
+              <div class="settings-grid">
+                <div class="setting-row"><span class="setting-lbl">EMA Fast</span><span class="setting-val">50</span></div>
+                <div class="setting-row"><span class="setting-lbl">EMA Slow</span><span class="setting-val">200</span></div>
+                <div class="setting-row"><span class="setting-lbl">RSI Period</span><span class="setting-val">14</span></div>
+                <div class="setting-row"><span class="setting-lbl">ATR Period</span><span class="setting-val">14</span></div>
+                <div class="setting-row"><span class="setting-lbl">RSI Buy Range</span><span class="setting-val">50 – 70</span></div>
+                <div class="setting-row"><span class="setting-lbl">RSI Sell Range</span><span class="setting-val">30 – 50</span></div>
+                <div class="setting-row"><span class="setting-lbl">RSI Dead Zone</span><span class="setting-val">45 – 55 (skip)</span></div>
+                <div class="setting-row"><span class="setting-lbl">RSI Extremes</span><span class="setting-val">&gt;80 / &lt;20 (skip)</span></div>
+                <div class="setting-row"><span class="setting-lbl">Candle Lookback</span><span class="setting-val">10 bars</span></div>
+                <div class="setting-row"><span class="setting-lbl">EMA Slope Min</span><span class="setting-val">0.08 % / 20 bars</span></div>
+                <div class="setting-row"><span class="setting-lbl">Volatility Ratio</span><span class="setting-val">ATR ≥ 70% of ATR-MA</span></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header"><span class="card-title">Risk Parameters</span></div>
+              <div class="settings-grid">
+                <div class="setting-row"><span class="setting-lbl">Risk / Trade</span><span class="setting-val hl-gold">1.0%</span></div>
+                <div class="setting-row"><span class="setting-lbl">Max Open Trades</span><span class="setting-val">3</span></div>
+                <div class="setting-row"><span class="setting-lbl">Daily Loss Limit</span><span class="setting-val hl-red">5.0%</span></div>
+                <div class="setting-row"><span class="setting-lbl">Stop Loss</span><span class="setting-val">1.5 × ATR</span></div>
+                <div class="setting-row"><span class="setting-lbl">Take Profit</span><span class="setting-val">2.0 × ATR</span></div>
+                <div class="setting-row"><span class="setting-lbl">Min Lot Size</span><span class="setting-val">0.01</span></div>
+                <div class="setting-row"><span class="setting-lbl">Max Lot Size</span><span class="setting-val">10.00</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-stack">
+            <div class="card">
+              <div class="card-header"><span class="card-title">Connection Info</span></div>
+              <div class="settings-grid" id="conn-info">
+                <div class="setting-row"><span class="setting-lbl">Account</span><span class="setting-val" id="si-login">—</span></div>
+                <div class="setting-row"><span class="setting-lbl">Name</span><span class="setting-val" id="si-name">—</span></div>
+                <div class="setting-row"><span class="setting-lbl">Server</span><span class="setting-val" id="si-server">—</span></div>
+                <div class="setting-row"><span class="setting-lbl">Currency</span><span class="setting-val" id="si-currency">—</span></div>
+                <div class="setting-row"><span class="setting-lbl">Leverage</span><span class="setting-val" id="si-leverage">—</span></div>
+                <div class="setting-row"><span class="setting-lbl">Mode</span><span class="setting-val" id="si-mode">—</span></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header"><span class="card-title">Entry Logic Summary</span></div>
+              <div class="logic-summary">
+                <div class="logic-rule buy-rule">
+                  <div class="lr-head">BUY Signal (ALL must be true)</div>
+                  <div class="lr-item">✓ Price &gt; EMA200 AND EMA50 &gt; EMA200</div>
+                  <div class="lr-item">✓ RSI between 50 and 70</div>
+                  <div class="lr-item">✓ Bullish candle breaks 10-bar high</div>
+                  <div class="lr-item">✓ ATR ≥ 70% of ATR moving average</div>
+                  <div class="lr-item">✓ EMA200 slope ≥ 0.08% (trending)</div>
+                  <div class="lr-item">✓ RSI not in 45–55 dead zone</div>
+                </div>
+                <div class="logic-rule sell-rule">
+                  <div class="lr-head">SELL Signal (ALL must be true)</div>
+                  <div class="lr-item">✓ Price &lt; EMA200 AND EMA50 &lt; EMA200</div>
+                  <div class="lr-item">✓ RSI between 30 and 50</div>
+                  <div class="lr-item">✓ Bearish candle breaks 10-bar low</div>
+                  <div class="lr-item">✓ ATR ≥ 70% of ATR moving average</div>
+                  <div class="lr-item">✓ EMA200 slope ≥ 0.08% (trending)</div>
+                  <div class="lr-item">✓ RSI not in 45–55 dead zone</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header"><span class="card-title">Actions</span></div>
+              <div style="padding:12px;display:flex;flex-direction:column;gap:10px">
+                <button class="btn-sm btn-danger" id="btn-disconnect">⏻ Disconnect &amp; Logout</button>
+                <div class="setting-note">
+                  To enable LIVE trading: set<br>
+                  <code>LIVE_TRADING_ENABLED = True</code><br>
+                  in <code>app/config.py</code> and restart.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- STATUS BAR -->
+  <div class="statusbar">
+    <span id="sb-market">Market: checking…</span>
+    <span class="sb-sep">·</span>
+    <span id="sb-last-update">Last update: —</span>
+    <span class="sb-sep">·</span>
+    <span id="sb-ws-status">WebSocket: connecting…</span>
+    <span class="sb-sep" style="margin-left:auto">·</span>
+    <span>© 2024 AST Capital</span>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src="/static/js/api.js"></script>
+<script src="/static/js/ws.js"></script>
+<script src="/static/js/charts.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>
