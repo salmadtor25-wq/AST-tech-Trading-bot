@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AST Capital — Algorithmic Trading</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg:     #04030200;
+    --brown:  #8B5A2B;
+    --brown2: #A8732F;
+    --brown3: #C08040;
+    --gold:   #D4A060;
+    --text:   #EDE0CA;
+    --dim:    #8C7A65;
+    --card:   #1a140d;
+  }
+
+  html { scroll-behavior: auto; }
+
+  body {
+    background: #040302;
+    color: var(--text);
+    font-family: 'Cormorant Garamond', serif;
+    overflow-x: hidden;
+  }
+
+  /* ── Scroll spacer ── */
+  #scroll-spacer { height: 700vh; width: 100%; pointer-events: none; }
+
+  /* ── Fixed canvas ── */
+  #c {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    display: block;
+  }
+
+  /* ── Progress bar ── */
+  #progress-bar {
+    position: fixed;
+    top: 0; left: 0;
+    height: 2px;
+    width: 0%;
+    background: linear-gradient(90deg, var(--brown), var(--gold));
+    z-index: 100;
+    transition: width 0.1s linear;
+  }
+
+  /* ── Loading overlay ── */
+  #loader {
+    position: fixed;
+    inset: 0;
+    background: #040302;
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    transition: opacity 1s ease, visibility 1s ease;
+  }
+  #loader.hidden { opacity: 0; visibility: hidden; }
+  #loader-logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 8px;
+    color: var(--gold);
+    text-transform: uppercase;
+  }
+  #loader-bar-wrap {
+    width: 200px;
+    height: 1px;
+    background: #2a1f14;
+    position: relative;
+    overflow: hidden;
+  }
+  #loader-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--brown), var(--gold));
+    transition: width 0.3s ease;
+  }
+  #loader-pct {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--dim);
+    letter-spacing: 3px;
+  }
+
+  /* ── HUD ── */
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    padding: 28px 48px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    z-index: 90;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+    pointer-events: none;
+  }
+  #hud.visible { opacity: 1; pointer-events: auto; }
+  #hud-logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 6px;
+    color: var(--gold);
+    text-transform: uppercase;
+  }
+  #hud-logo span { color: var(--dim); font-size: 9px; display: block; margin-top: 4px; letter-spacing: 4px; }
+  #hud-nav {
+    display: flex;
+    gap: 32px;
+    align-items: center;
+  }
+  #hud-nav a {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: var(--dim);
+    text-decoration: none;
+    text-transform: uppercase;
+    transition: color 0.3s;
+    pointer-events: auto;
+  }
+  #hud-nav a:hover { color: var(--gold); }
+  #hud-nav .cta {
+    border: 1px solid var(--brown);
+    padding: 8px 20px;
+    color: var(--brown3);
+  }
+  #hud-nav .cta:hover { background: rgba(192,128,64,.1); color: var(--gold); border-color: var(--gold); }
+
+  /* ── Corner decorations ── */
+  .corner {
+    position: fixed;
+    width: 40px;
+    height: 40px;
+    z-index: 89;
+    opacity: 0;
+    transition: opacity 1s ease;
+  }
+  .corner.visible { opacity: 0.4; }
+  .corner::before, .corner::after { content: ''; position: absolute; background: var(--brown); }
+  .corner-tl { top: 20px; left: 20px; }
+  .corner-tl::before { width: 1px; height: 30px; top: 0; left: 0; }
+  .corner-tl::after  { width: 30px; height: 1px; top: 0; left: 0; }
+  .corner-tr { top: 20px; right: 20px; }
+  .corner-tr::before { width: 1px; height: 30px; top: 0; right: 0; }
+  .corner-tr::after  { width: 30px; height: 1px; top: 0; right: 0; }
+  .corner-bl { bottom: 20px; left: 20px; }
+  .corner-bl::before { width: 1px; height: 30px; bottom: 0; left: 0; }
+  .corner-bl::after  { width: 30px; height: 1px; bottom: 0; left: 0; }
+  .corner-br { bottom: 20px; right: 20px; }
+  .corner-br::before { width: 1px; height: 30px; bottom: 0; right: 0; }
+  .corner-br::after  { width: 30px; height: 1px; bottom: 0; right: 0; }
+
+  /* ── Text overlay ── */
+  #overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    pointer-events: none;
+  }
+
+  .scene-text {
+    position: absolute;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+    max-width: 480px;
+  }
+  .scene-text.active { opacity: 1; }
+
+  .scene-text .eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 5px;
+    color: var(--brown3);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .scene-text h2 {
+    font-size: clamp(32px, 4vw, 56px);
+    font-weight: 300;
+    line-height: 1.15;
+    color: var(--text);
+    margin-bottom: 16px;
+  }
+  .scene-text h2 em {
+    font-style: italic;
+    color: var(--gold);
+  }
+  .scene-text p {
+    font-size: clamp(14px, 1.4vw, 17px);
+    font-weight: 300;
+    line-height: 1.75;
+    color: var(--dim);
+    letter-spacing: 0.3px;
+  }
+  .scene-text .metric {
+    margin-top: 28px;
+    display: flex;
+    gap: 32px;
+  }
+  .scene-text .metric-item { display: flex; flex-direction: column; gap: 4px; }
+  .scene-text .metric-val {
+    font-family: 'Space Mono', monospace;
+    font-size: 22px;
+    color: var(--gold);
+    letter-spacing: 1px;
+  }
+  .scene-text .metric-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 3px;
+    color: var(--dim);
+    text-transform: uppercase;
+  }
+
+  /* scene 1 — center */
+  #s1 { top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; max-width: 600px; }
+  #s1 h2 { font-size: clamp(40px, 5vw, 72px); }
+
+  /* scene 2 — left mid */
+  #s2 { top: 50%; left: 8%; transform: translateY(-50%); }
+
+  /* scene 3 — right bottom */
+  #s3 { bottom: 15%; right: 8%; text-align: right; }
+
+  /* scene 4 — center low */
+  #s4 { bottom: 18%; left: 50%; transform: translateX(-50%); text-align: center; }
+
+  /* scene 5 — left top */
+  #s5 { top: 22%; left: 8%; }
+
+  /* scene 6 — center */
+  #s6 { top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: auto; }
+  #s6 .cta-btn {
+    display: inline-block;
+    margin-top: 32px;
+    padding: 14px 48px;
+    border: 1px solid var(--brown);
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: var(--gold);
+    text-transform: uppercase;
+    text-decoration: none;
+    transition: all 0.35s ease;
+    pointer-events: auto;
+  }
+  #s6 .cta-btn:hover {
+    background: rgba(192,128,64,.15);
+    border-color: var(--gold);
+    letter-spacing: 6px;
+  }
+
+  /* ── Scroll hint ── */
+  #scroll-hint {
+    position: fixed;
+    bottom: 36px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 85;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+  }
+  #scroll-hint.visible { opacity: 1; }
+  #scroll-hint span {
+    font-family: 'Space Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 4px;
+    color: var(--dim);
+    text-transform: uppercase;
+  }
+  #scroll-hint-line {
+    width: 1px;
+    height: 40px;
+    background: linear-gradient(180deg, var(--brown3), transparent);
+    animation: scrollPulse 1.8s ease-in-out infinite;
+  }
+  @keyframes scrollPulse {
+    0%, 100% { transform: scaleY(1); opacity: 0.6; }
+    50%       { transform: scaleY(0.6); opacity: 1; }
+  }
+
+  /* ── Section indicator dots ── */
+  #dots {
+    position: fixed;
+    right: 32px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 85;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    opacity: 0;
+    transition: opacity 0.8s;
+  }
+  #dots.visible { opacity: 1; }
+  .dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--dim);
+    transition: background 0.3s, transform 0.3s;
+  }
+  .dot.active { background: var(--gold); transform: scale(1.8); }
+</style>
+</head>
+<body>
+
+<div id="progress-bar"></div>
+
+<!-- Loading overlay -->
+<div id="loader">
+  <div id="loader-logo">AST Capital<span>Algorithmic Trading</span></div>
+  <div id="loader-bar-wrap"><div id="loader-bar"></div></div>
+  <div id="loader-pct">0%</div>
+</div>
+
+<!-- WebGL canvas -->
+<canvas id="c"></canvas>
+
+<!-- Scroll spacer -->
+<div id="scroll-spacer"></div>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="hud-logo">AST Capital<span>Algorithmic Systems</span></div>
+  <nav id="hud-nav">
+    <a href="#">Markets</a>
+    <a href="#">Strategy</a>
+    <a href="#">Performance</a>
+    <a href="../frontend/index.html" class="cta">Launch Platform</a>
+  </nav>
+</div>
+
+<!-- Corner decorations -->
+<div class="corner corner-tl"></div>
+<div class="corner corner-tr"></div>
+<div class="corner corner-bl"></div>
+<div class="corner corner-br"></div>
+
+<!-- Text overlay -->
+<div id="overlay">
+  <div class="scene-text" id="s1">
+    <div class="eyebrow">Est. 2024 — Algorithmic Trading</div>
+    <h2>Where <em>Precision</em><br>Meets the Market</h2>
+    <p>Eight-condition signal architecture. Real-time execution.<br>Engineered for edge.</p>
+  </div>
+
+  <div class="scene-text" id="s2">
+    <div class="eyebrow">Signal Architecture</div>
+    <h2>Eight Layers<br>of <em>Confirmation</em></h2>
+    <p>EMA trend alignment. RSI momentum gating.<br>ATR volatility filters. Candle breakout<br>confirmation. No noise. Only signal.</p>
+    <div class="metric">
+      <div class="metric-item">
+        <div class="metric-val">8</div>
+        <div class="metric-label">Conditions</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-val">1%</div>
+        <div class="metric-label">Risk / Trade</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-val">24/5</div>
+        <div class="metric-label">Active Hours</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="scene-text" id="s3">
+    <div class="eyebrow">Risk Management</div>
+    <h2><em>Calculated</em><br>Precision</h2>
+    <p>ATR-scaled stop loss. Dynamic position sizing.<br>5% daily drawdown halt. Maximum 3<br>concurrent positions.</p>
+  </div>
+
+  <div class="scene-text" id="s4">
+    <div class="eyebrow">Technology Stack</div>
+    <h2>Built for<br><em>Performance</em></h2>
+    <p>FastAPI async backend. Real-time WebSocket feeds.<br>MetaTrader 5 direct execution. Browser-native interface.</p>
+  </div>
+
+  <div class="scene-text" id="s5">
+    <div class="eyebrow">Market Intelligence</div>
+    <h2>Reads the<br><em>Rhythm</em></h2>
+    <p>Session-aware execution. London/New York peak<br>overlap detection. Volatility-adjusted entry timing.<br>No weekend exposure.</p>
+    <div class="metric">
+      <div class="metric-item">
+        <div class="metric-val">4</div>
+        <div class="metric-label">FX Sessions</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-val">EMA</div>
+        <div class="metric-label">50 / 200</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="scene-text" id="s6">
+    <div class="eyebrow">AST Capital</div>
+    <h2>Ready to<br><em>Trade</em></h2>
+    <p>Connect your MetaTrader account.<br>Let the algorithm work.</p>
+    <a href="../frontend/index.html" class="cta-btn">Open Platform</a>
+  </div>
+</div>
+
+<!-- Scroll hint -->
+<div id="scroll-hint">
+  <span>Scroll</span>
+  <div id="scroll-hint-line"></div>
+</div>
+
+<!-- Section dots -->
+<div id="dots">
+  <div class="dot active" data-i="0"></div>
+  <div class="dot" data-i="1"></div>
+  <div class="dot" data-i="2"></div>
+  <div class="dot" data-i="3"></div>
+  <div class="dot" data-i="4"></div>
+  <div class="dot" data-i="5"></div>
+</div>
+
+<!-- CDN Libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r165/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.4/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.4/ScrollTrigger.min.js"></script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   AST Capital — Cinematic Scroll Animation
+   Three.js r165 · GSAP 3.12.4 · ScrollTrigger
+══════════════════════════════════════════════════════════════ */
+
+gsap.registerPlugin(ScrollTrigger);
+
+// ── Colour palette ────────────────────────────────────────────
+const C = {
+  bg:      0x040302,
+  brown:   0x8B5A2B,
+  brown2:  0xA8732F,
+  brown3:  0xC08040,
+  gold:    0xD4A060,
+  text:    0xEDE0CA,
+  dark:    0x1a140d,
+  near:    0x2e2115,
+};
+
+// ── Scene setup ───────────────────────────────────────────────
+const canvas   = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
+
+const scene  = new THREE.Scene();
+scene.fog    = new THREE.FogExp2(C.bg, 0.0042);
+
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 2000);
+camera.position.set(0, 35, 180);
+
+// ── Camera proxy (GSAP tweens this; RAF reads it) ─────────────
+const cam = { x:0, y:35, z:180, lx:0, ly:0, lz:0 };
+const mouseOff = { x:0, y:0 };   // smoothed mouse parallax offset
+
+// ── Nebula sky-dome ───────────────────────────────────────────
+const nebulaVert = `
+varying vec3 vDir;
+void main(){
+  vDir = normalize(position);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+const nebulaFrag = `
+varying vec3 vDir;
+uniform float uTime;
+
+float hash(vec3 p){ p=fract(p*vec3(443.897,441.423,437.195));p+=dot(p,p.yxz+19.19);return fract((p.x+p.y)*p.z); }
+float noise(vec3 p){
+  vec3 i=floor(p); vec3 f=fract(p); f=f*f*(3.0-2.0*f);
+  return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),
+                 mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),
+             mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),
+                 mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);
+}
+float fbm(vec3 p){
+  float v=0.0,a=0.5;
+  for(int i=0;i<5;i++){ v+=a*noise(p); p*=2.1; a*=0.5; }
+  return v;
+}
+void main(){
+  vec3 d = normalize(vDir);
+  float n1 = fbm(d*2.8 + uTime*0.015);
+  float n2 = fbm(d*5.5 - uTime*0.008);
+  float nebula = n1*0.6 + n2*0.4;
+
+  vec3 col1 = vec3(0.10, 0.055, 0.02);  // deep amber
+  vec3 col2 = vec3(0.22, 0.12, 0.04);   // brown nebula
+  vec3 col3 = vec3(0.04, 0.02, 0.01);   // void
+  vec3 col = mix(col3, mix(col1, col2, nebula*1.4), nebula*0.7);
+
+  // vignette toward equator
+  float horizon = 1.0 - abs(d.y);
+  col += vec3(0.06,0.03,0.01) * pow(horizon, 3.0) * 0.4;
+
+  gl_FragColor = vec4(col, 1.0);
+}`;
+
+const nebulaMat  = new THREE.ShaderMaterial({ vertexShader: nebulaVert, fragmentShader: nebulaFrag, uniforms:{ uTime:{ value:0 } }, side: THREE.BackSide });
+const nebulaGeo  = new THREE.SphereGeometry(900, 32, 32);
+const nebulaMesh = new THREE.Mesh(nebulaGeo, nebulaMat);
+scene.add(nebulaMesh);
+
+// ── Stars ─────────────────────────────────────────────────────
+function makeStars(count, spread, sizeMin, sizeMax, colorHex) {
+  const pos = new Float32Array(count * 3);
+  const sizes = new Float32Array(count);
+  for (let i = 0; i < count; i++) {
+    pos[i*3]   = (Math.random()-0.5)*spread;
+    pos[i*3+1] = (Math.random()-0.5)*spread;
+    pos[i*3+2] = (Math.random()-0.5)*spread;
+    sizes[i]   = sizeMin + Math.random()*(sizeMax-sizeMin);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+  const mat = new THREE.PointsMaterial({ color: colorHex, size: 0.8, sizeAttenuation: true, transparent: true, opacity: 0.85, depthWrite: false });
+  return new THREE.Points(geo, mat);
+}
+scene.add(makeStars(2500, 1400, 0.4, 1.2, 0xEDE0CA));
+scene.add(makeStars(600,   800, 0.3, 0.7, 0xA87840));
+
+// ── Grid plane ────────────────────────────────────────────────
+const gridVert = `
+varying vec2 vUv;
+varying vec3 vWorldPos;
+void main(){
+  vUv = uv;
+  vec4 wp = modelMatrix * vec4(position,1.0);
+  vWorldPos = wp.xyz;
+  gl_Position = projectionMatrix * viewMatrix * wp;
+}`;
+const gridFrag = `
+varying vec2 vUv;
+varying vec3 vWorldPos;
+uniform float uTime;
+uniform float uOpacity;
+
+float gridLine(vec2 uv, float freq, float lw){
+  vec2 g = abs(fract(uv*freq - 0.5) - 0.5) / fwidth(uv*freq);
+  return 1.0 - min(min(g.x,g.y), 1.0);
+}
+void main(){
+  float g1 = gridLine(vUv, 20.0, 1.5);
+  float g2 = gridLine(vUv, 4.0,  1.0) * 0.5;
+  float grid = max(g1*0.6, g2);
+
+  // radial fade from center
+  float dist = length(vUv - 0.5);
+  float fade = 1.0 - smoothstep(0.25, 0.5, dist);
+
+  // pulse sweep
+  float sweep = fract(vWorldPos.z * 0.004 - uTime * 0.06);
+  float pulse = exp(-sweep * 8.0) * 0.6;
+
+  vec3 col = vec3(0.62, 0.40, 0.18) * (grid + pulse);
+  gl_FragColor = vec4(col, uOpacity * fade * (grid + pulse * 0.4));
+}`;
+
+const gridMat  = new THREE.ShaderMaterial({ vertexShader: gridVert, fragmentShader: gridFrag, uniforms:{ uTime:{value:0}, uOpacity:{value:0.0} }, transparent:true, depthWrite:false, side:THREE.DoubleSide });
+const gridMesh = new THREE.Mesh(new THREE.PlaneGeometry(400, 400, 1, 1), gridMat);
+gridMesh.rotation.x = -Math.PI / 2;
+gridMesh.position.y = -12;
+scene.add(gridMesh);
+
+// ── Central crystal (icosahedron) ─────────────────────────────
+const crystalGroup = new THREE.Group();
+scene.add(crystalGroup);
+crystalGroup.scale.setScalar(0); // starts invisible
+
+const crystalGeo  = new THREE.IcosahedronGeometry(8, 1);
+const crystalMat  = new THREE.MeshStandardMaterial({ color: C.brown2, metalness: 0.9, roughness: 0.1, emissive: new THREE.Color(0x3d1f05), emissiveIntensity: 0.4 });
+const crystalMesh = new THREE.Mesh(crystalGeo, crystalMat);
+crystalMesh.castShadow = true;
+crystalGroup.add(crystalMesh);
+
+// Wireframe overlay
+const wireMat  = new THREE.MeshBasicMaterial({ color: C.gold, wireframe: true, transparent: true, opacity: 0.15 });
+const wireMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(8.05, 1), wireMat);
+crystalGroup.add(wireMesh);
+
+// Inner glow sphere
+const glowGeo  = new THREE.SphereGeometry(5, 16, 16);
+const glowMat  = new THREE.MeshBasicMaterial({ color: C.brown3, transparent: true, opacity: 0.08 });
+const glowMesh = new THREE.Mesh(glowGeo, glowMat);
+crystalGroup.add(glowMesh);
+
+// Outer torus
+const torusMesh = new THREE.Mesh(
+  new THREE.TorusGeometry(14, 0.3, 8, 80),
+  new THREE.MeshBasicMaterial({ color: C.brown, transparent: true, opacity: 0.25 })
+);
+torusMesh.rotation.x = Math.PI / 2;
+crystalGroup.add(torusMesh);
+
+// ── Orbital rings ─────────────────────────────────────────────
+const rings = [];
+const ringDefs = [
+  { r:22, tube:0.15, tilt:0.4, speed:0.004, opacity:0.30 },
+  { r:30, tube:0.10, tilt:-0.7, speed:0.0028, opacity:0.20 },
+  { r:40, tube:0.08, tilt:1.1, speed:0.002, opacity:0.12 },
+];
+ringDefs.forEach(d => {
+  const m = new THREE.Mesh(
+    new THREE.TorusGeometry(d.r, d.tube, 4, 120),
+    new THREE.MeshBasicMaterial({ color: C.brown2, transparent: true, opacity: d.opacity, depthWrite: false })
+  );
+  m.rotation.x = d.tilt;
+  m.rotation.z = Math.random() * Math.PI;
+  m.userData.speed = d.speed;
+  crystalGroup.add(m);
+  rings.push(m);
+});
+
+// ── Accent lights ─────────────────────────────────────────────
+const lights = [];
+const lightCols = [0xC08040, 0xA85020, 0xD4A060];
+const lightPositions = [[30,20,10], [-25,15,-15], [0,-10,25]];
+lightPositions.forEach((pos, i) => {
+  const l = new THREE.PointLight(lightCols[i], 0, 80); // intensity starts at 0
+  l.position.set(...pos);
+  l.castShadow = true;
+  scene.add(l);
+  lights.push(l);
+});
+
+// Ambient
+const ambient = new THREE.AmbientLight(0x2a1505, 0.6);
+scene.add(ambient);
+const dirLight = new THREE.DirectionalLight(0xC08040, 0.4);
+dirLight.position.set(50, 80, 30);
+scene.add(dirLight);
+
+// ── Data stream particles ─────────────────────────────────────
+const streams = [];
+const streamCols = [C.brown3, C.gold, C.brown2];
+for (let s = 0; s < 10; s++) {
+  const count = 80;
+  const pos   = new Float32Array(count * 3);
+  const cx    = (Math.random()-0.5)*120;
+  const cz    = (Math.random()-0.5)*120;
+  for (let i = 0; i < count; i++) {
+    pos[i*3]   = cx + (Math.random()-0.5)*2;
+    pos[i*3+1] = (Math.random()-0.5)*60;
+    pos[i*3+2] = cz + (Math.random()-0.5)*2;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({ color: streamCols[s%3], size: 0.6, transparent: true, opacity: 0.0, depthWrite: false, blending: THREE.AdditiveBlending });
+  const pts = new THREE.Points(geo, mat);
+  pts.userData = { cx, cz, count, speed: 0.15 + Math.random()*0.2 };
+  scene.add(pts);
+  streams.push(pts);
+}
+
+// ── Background structures ─────────────────────────────────────
+const structures = [];
+const structureGeos = [
+  new THREE.BoxGeometry(6,30,6),
+  new THREE.CylinderGeometry(2,3,25,6),
+  new THREE.OctahedronGeometry(5),
+  new THREE.TetrahedronGeometry(6),
+];
+for (let i = 0; i < 15; i++) {
+  const geo  = structureGeos[i % structureGeos.length];
+  const mat  = new THREE.MeshBasicMaterial({ color: C.brown, wireframe: true, transparent: true, opacity: 0.07 + Math.random()*0.06 });
+  const mesh = new THREE.Mesh(geo, mat);
+  const angle = (i/15) * Math.PI*2;
+  const dist  = 60 + Math.random()*80;
+  mesh.position.set(Math.cos(angle)*dist, (Math.random()-0.5)*40, Math.sin(angle)*dist - 30);
+  mesh.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+  mesh.userData.rotSpeed = { x:(Math.random()-0.5)*0.002, y:(Math.random()-0.5)*0.003, z:0 };
+  scene.add(mesh);
+  structures.push(mesh);
+}
+
+// ── Mouse parallax ────────────────────────────────────────────
+const mouseCurrent = { x:0, y:0 };
+document.addEventListener('mousemove', e => {
+  mouseCurrent.x = (e.clientX / window.innerWidth  - 0.5) * 8;
+  mouseCurrent.y = (e.clientY / window.innerHeight - 0.5) * 4;
+});
+
+// ── Resize handler ────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ── Loader ────────────────────────────────────────────────────
+const loaderBar = document.getElementById('loader-bar');
+const loaderPct = document.getElementById('loader-pct');
+let loadProgress = 0;
+const loaderInterval = setInterval(() => {
+  loadProgress = Math.min(loadProgress + Math.random()*12, 100);
+  loaderBar.style.width = loadProgress + '%';
+  loaderPct.textContent = Math.floor(loadProgress) + '%';
+  if (loadProgress >= 100) {
+    clearInterval(loaderInterval);
+    setTimeout(() => {
+      document.getElementById('loader').classList.add('hidden');
+      document.getElementById('hud').classList.add('visible');
+      document.getElementById('scroll-hint').classList.add('visible');
+      document.getElementById('dots').classList.add('visible');
+      document.querySelectorAll('.corner').forEach(c => c.classList.add('visible'));
+    }, 400);
+  }
+}, 80);
+
+// ── GSAP ScrollTrigger timeline ───────────────────────────────
+const tl = gsap.timeline({
+  scrollTrigger: {
+    trigger: '#scroll-spacer',
+    start: 'top top',
+    end: 'bottom bottom',
+    scrub: 2.5,
+    onUpdate: self => {
+      const p = self.progress;
+      document.getElementById('progress-bar').style.width = (p*100) + '%';
+
+      // Show / hide text sections based on scroll position
+      const sections = [
+        { id:'s1', start:0.00, peak:0.04, end:0.12 },
+        { id:'s2', start:0.12, peak:0.20, end:0.32 },
+        { id:'s3', start:0.32, peak:0.42, end:0.52 },
+        { id:'s4', start:0.52, peak:0.60, end:0.68 },
+        { id:'s5', start:0.68, peak:0.75, end:0.83 },
+        { id:'s6', start:0.88, peak:0.93, end:1.00 },
+      ];
+      sections.forEach((s, i) => {
+        const el = document.getElementById(s.id);
+        let alpha = 0;
+        if (p >= s.start && p <= s.end) {
+          if (p < s.peak) alpha = (p - s.start) / (s.peak - s.start);
+          else            alpha = 1 - (p - s.peak) / (s.end - s.peak);
+          alpha = Math.max(0, Math.min(1, alpha));
+        }
+        el.style.opacity = alpha;
+
+        // Active dot
+        const dotEls = document.querySelectorAll('.dot');
+        if (alpha > 0.5) {
+          dotEls.forEach(d => d.classList.remove('active'));
+          if (dotEls[i]) dotEls[i].classList.add('active');
+        }
+      });
+
+      // Hide scroll hint after first 5%
+      const hint = document.getElementById('scroll-hint');
+      hint.style.opacity = p < 0.05 ? (1 - p*20) : 0;
+    }
+  }
+});
+
+// Phase 1 (0–15%): Opening — pull from far to closer overhead
+tl.to(cam, { x:0, y:20, z:130, lx:0, ly:0, lz:0, duration:15 }, 0)
+  .to(gridMat.uniforms.uOpacity, { value: 0.2, duration:8 }, 5);
+
+// Phase 2 (15–35%): Grid reveals, move to side
+tl.to(cam, { x:-25, y:12, z:110, lx:0, ly:0, lz:0, duration:20 }, 15)
+  .to(gridMat.uniforms.uOpacity, { value: 0.7, duration:12 }, 15);
+
+// Phase 3 (35–55%): Dive through grid, data streams activate
+tl.to(cam, { x:20, y:-2, z:85, lx:0, ly:2, lz:0, duration:20 }, 35);
+streams.forEach((s, i) => {
+  tl.to(s.material, { opacity: 0.55, duration: 8 }, 35 + i*0.5);
+});
+
+// Phase 4 (55–70%): Crystal reveals, camera circles close
+tl.to(cam, { x:-15, y:8, z:60, lx:0, ly:2, lz:0, duration:15 }, 55)
+  .to(crystalGroup.scale, { x:1, y:1, z:1, duration:10, ease:'elastic.out(1, 0.5)' }, 55);
+lights.forEach((l, i) => {
+  tl.to(l, { intensity: 2.5, duration: 10 }, 58 + i*1.5);
+});
+tl.to(gridMat.uniforms.uOpacity, { value: 0.35, duration:10 }, 60);
+
+// Phase 5 (70–85%): Orbit the crystal
+tl.to(cam, { x:50, y:15, z:55, lx:0, ly:0, lz:0, duration:15 }, 70);
+tl.to(cam, { x:0,  y:25, z:65, lx:0, ly:0, lz:0, duration:8  }, 82);
+
+// Phase 6 (85–100%): Final pullback + CTA
+tl.to(cam, { x:0, y:18, z:95, lx:0, ly:0, lz:0, duration:15 }, 85)
+  .to(gridMat.uniforms.uOpacity, { value: 0.15, duration:10 }, 88);
+lights.forEach((l, i) => {
+  tl.to(l, { intensity: 1.0, duration:8 }, 90 + i);
+});
+
+// ── Render loop ───────────────────────────────────────────────
+let t = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  t += 0.008;
+
+  // Uniforms
+  nebulaMat.uniforms.uTime.value = t;
+  gridMat.uniforms.uTime.value   = t;
+
+  // Crystal spin
+  if (crystalMesh.parent) {
+    crystalMesh.rotation.y += 0.004;
+    crystalMesh.rotation.x += 0.0015;
+    wireMesh.rotation.y    -= 0.003;
+    torusMesh.rotation.z   += 0.002;
+    rings.forEach(r => r.rotation.z += r.userData.speed);
+  }
+
+  // Background structures drift
+  structures.forEach(s => {
+    s.rotation.x += s.userData.rotSpeed.x;
+    s.rotation.y += s.userData.rotSpeed.y;
+  });
+
+  // Data streams waterfall
+  streams.forEach(s => {
+    const pos = s.geometry.attributes.position;
+    for (let i = 0; i < s.userData.count; i++) {
+      pos.array[i*3+1] -= s.userData.speed;
+      if (pos.array[i*3+1] < -30) pos.array[i*3+1] = 30;
+    }
+    pos.needsUpdate = true;
+  });
+
+  // Smooth mouse parallax
+  mouseOff.x += (mouseCurrent.x - mouseOff.x) * 0.04;
+  mouseOff.y += (mouseCurrent.y - mouseOff.y) * 0.04;
+
+  // Apply camera from proxy + mouse offset
+  camera.position.set(
+    cam.x + mouseOff.x,
+    cam.y - mouseOff.y * 0.5,
+    cam.z
+  );
+  camera.lookAt(cam.lx, cam.ly, cam.lz);
+
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>
