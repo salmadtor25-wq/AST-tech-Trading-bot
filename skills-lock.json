@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "skills": {
+    "add-expert": {
+      "source": "remotion-dev/remotion",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/add-expert/SKILL.md",
+      "computedHash": "c81e4d1028e2e71d7431a12b5b87ab24fa66d348048d6928c37f9bdf3ec046a1"
+    },
+    "add-sfx": {
+      "source": "remotion-dev/remotion",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/add-sfx/SKILL.md",
+      "computedHash": "d87f8578c7cfa0bf84761f1a85a3bb43e9c63d2a3507dcdcc96ec790f0b4a170"
+    },
+    "docs-demo": {
+      "source": "remotion-dev/remotion",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/docs-demo/SKILL.md",
+      "computedHash": "ffada361c85f16ff4cc7189dd27a441435aa012a4914477d70573c43fdbe47c0"
+    },
+    "fix-dependabot": {
+      "source": "remotion-dev/remotion",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/fix-dependabot/SKILL.md",
+      "computedHash": "4d2afd6cfbabd1e075c32f4b6607e80ca75ab4d79f4e145f1bd684735e09d557"
+    },
+    "make-pr": {
+      "source": "remotion-dev/remotion",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/pr/SKILL.md",
+      "computedHash": "ae9ac7db29c57bc8432d676382d76659ea45367af411d9559a2e2fb3d036855c"
+    },
+    "pr-name": {
+      "source": "remotion-dev/remotion",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/pr-name/SKILL.md",
+      "computedHash": "e77902308e5f505eeae7590c18c2a87d3feab8405d503616fab5f86a8f57470b"
+    },
+    "video-report": {
+      "source": "remotion-dev/remotion",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/video-report/SKILL.md",
+      "computedHash": "b5cf9b7014112c070736b6d935fb6babf80eb9acec8363d9adc2e69ae9f50136"
+    },
+    "web-renderer-test": {
+      "source": "remotion-dev/remotion",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/web-renderer-test/SKILL.md",
+      "computedHash": "c5edfba5d68d897b3cdf9b208db16f99506d84852ef50a192c55b216cc18a2cf"
+    },
+    "writing-docs": {
+      "source": "remotion-dev/remotion",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/writing-docs/SKILL.md",
+      "computedHash": "d93e46f86c4218e1b43a7eb4256375e1ed1dbefdd78cc54e668eac7e9b9816be"
+    }
+  }
+}
