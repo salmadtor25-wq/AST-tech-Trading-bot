@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import Lenis from 'lenis'
+import 'lenis/dist/lenis.css'
 import Scene from './components/Scene'
 import Loader from './components/Loader'
 import HUD from './components/hud/HUD'
@@ -15,21 +16,14 @@ import {
 
 gsap.registerPlugin(ScrollTrigger)
 
-// Camera positions per section
 const CAM_PHASES = [
-  // Hero — wide, chip floating from afar
   { x: 0,   y: 18,  z: 55,  lx: 0, ly: 0,  lz: 0  },
-  // Nexus Core — pull in, slight above
   { x: 10,  y: 10,  z: 35,  lx: 0, ly: 1,  lz: 0  },
-  // AI Systems — side angle, medium close
   { x: -14, y: 5,   z: 28,  lx: 0, ly: 2,  lz: 0  },
-  // Infrastructure — from below / dramatic
   { x: 6,   y: -3,  z: 22,  lx: 0, ly: 0,  lz: 0  },
-  // CTA — pulled back, elevated
   { x: 0,   y: 22,  z: 50,  lx: 0, ly: -2, lz: 0  },
 ]
 
-// Scroll ranges [0..1] where each section is "active"
 const SECTION_RANGES = [
   [0.00, 0.18],
   [0.16, 0.36],
@@ -39,34 +33,32 @@ const SECTION_RANGES = [
 ]
 
 export default function App() {
-  const [loaded, setLoaded] = useState(false)
+  const [loaded, setLoaded]               = useState(false)
   const [activeSection, setActiveSection] = useState(0)
   const [scrollProgress, setScrollProgress] = useState(0)
-  const [showPanels, setShowPanels] = useState(false)
-  const [showHint, setShowHint]   = useState(true)
+  const [showPanels, setShowPanels]       = useState(false)
+  const [showHint, setShowHint]           = useState(true)
 
-  // Camera proxy (mutated by GSAP, read by Three.js each frame)
   const camProxy = useRef({ ...CAM_PHASES[0] })
-  const lenisRef = useRef(null)
 
-  const handleLoaded = useCallback(() => {
-    setLoaded(true)
-    setShowPanels(true)
-  }, [])
+  const handleLoaded = useCallback(() => setLoaded(true), [])
 
-  // Smooth scroll + GSAP ScrollTrigger setup
   useEffect(() => {
     if (!loaded) return
 
-    // Lenis smooth scroll
+    // ── Lenis smooth scroll ──────────────────────────────────────
     const lenis = new Lenis({ lerp: 0.07, smoothWheel: true })
-    lenisRef.current = lenis
 
-    lenis.on('scroll', ScrollTrigger.update)
-    gsap.ticker.add(time => lenis.raf(time * 1000))
+    // Keep ScrollTrigger in sync with Lenis scroll position
+    const onLenisScroll = () => ScrollTrigger.update()
+    lenis.on('scroll', onLenisScroll)
+
+    // Drive Lenis via GSAP ticker (store ref for cleanup)
+    const lenisRaf = time => lenis.raf(time * 1000)
+    gsap.ticker.add(lenisRaf)
     gsap.ticker.lagSmoothing(0)
 
-    // Main scroll timeline
+    // ── ScrollTrigger timeline ───────────────────────────────────
     const tl = gsap.timeline({
       scrollTrigger: {
         trigger: '#scroll-space',
@@ -78,21 +70,17 @@ export default function App() {
           setScrollProgress(p)
           setShowHint(p < 0.05)
 
-          // Determine active section
           let active = 0
           SECTION_RANGES.forEach(([start, end], i) => {
             if (p >= start && p <= end) active = i
           })
           setActiveSection(active)
-
-          // AI Systems section toggles holographic panels
           setShowPanels(p >= 0.34 && p <= 0.56)
         },
       },
     })
 
-    // Animate camera proxy through phases
-    const dur = 25 // duration units per phase
+    const dur = 25
     CAM_PHASES.forEach((phase, i) => {
       tl.to(camProxy.current, {
         x: phase.x, y: phase.y, z: phase.z,
@@ -103,6 +91,9 @@ export default function App() {
     })
 
     return () => {
+      // Full cleanup — critical for React StrictMode double-mount
+      lenis.off('scroll', onLenisScroll)
+      gsap.ticker.remove(lenisRaf)
       lenis.destroy()
       ScrollTrigger.getAll().forEach(t => t.kill())
       tl.kill()
@@ -111,20 +102,16 @@ export default function App() {
 
   return (
     <>
-      {/* Loading screen */}
       {!loaded && <Loader onComplete={handleLoaded} />}
 
-      {/* Scanlines */}
       <div className="scanlines" />
 
-      {/* 3D WebGL canvas (fixed) */}
       <Scene
         camProxy={camProxy}
         scrollProgress={scrollProgress}
         showPanels={showPanels}
       />
 
-      {/* HUD overlay */}
       {loaded && (
         <HUD
           activeSection={activeSection}
@@ -133,18 +120,16 @@ export default function App() {
         />
       )}
 
-      {/* HTML text sections (fixed, fade in/out) */}
       {loaded && (
         <div className="sections">
-          <HeroSection    active={activeSection === 0} />
+          <HeroSection      active={activeSection === 0} />
           <NexusCoreSection active={activeSection === 1} />
           <AISystemsSection active={activeSection === 2} />
-          <InfraSection   active={activeSection === 3} />
-          <CTASection     active={activeSection === 4} />
+          <InfraSection     active={activeSection === 3} />
+          <CTASection       active={activeSection === 4} />
         </div>
       )}
 
-      {/* Scroll spacer — drives ScrollTrigger */}
       <div id="scroll-space" />
     </>
   )

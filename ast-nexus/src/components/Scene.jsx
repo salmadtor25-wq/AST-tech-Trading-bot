@@ -53,21 +53,22 @@ function GroundPlane() {
   )
 }
 
+// Panel data outside component — avoids recreation on every render
+const PANEL_DATA = [
+  { pos: [-8, 2, -3], col: '#C9A227' },
+  { pos: [ 8, 3, -3], col: '#4D7FFF' },
+  { pos: [-6,-1,  4], col: '#C9A227' },
+  { pos: [ 7,-2,  4], col: '#00D4FF' },
+]
+
 // Floating holographic panels (AI Systems section)
 function HoloPanels({ visible }) {
-  const panelData = [
-    { pos: [-8, 2, -3], title: 'PREDICTIVE AI', col: '#C9A227' },
-    { pos: [ 8, 3, -3], title: 'AUTOMATION',   col: '#4D7FFF' },
-    { pos: [-6,-1,  4], title: 'ANALYTICS',    col: '#C9A227' },
-    { pos: [ 7,-2,  4], title: 'DASHBOARDS',   col: '#00D4FF' },
-  ]
-
   const refs = useRef([])
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime()
     refs.current.forEach((g, i) => {
       if (!g) return
-      g.position.y = panelData[i].pos[1] + Math.sin(t * 0.5 + i) * 0.3
+      g.position.y = PANEL_DATA[i].pos[1] + Math.sin(t * 0.5 + i) * 0.3
       g.rotation.y = Math.sin(t * 0.2 + i) * 0.12
     })
   })
@@ -76,7 +77,7 @@ function HoloPanels({ visible }) {
 
   return (
     <group>
-      {panelData.map((p, i) => (
+      {PANEL_DATA.map((p, i) => (
         <group key={i} position={p.pos} ref={el => refs.current[i] = el}>
           {/* Panel frame */}
           <mesh>
